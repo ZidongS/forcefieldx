@@ -5,7 +5,7 @@ R=Path(__file__).resolve().parent;P=R.parents[1]/'validation/AD_GBn2_71_test_pac
 rows=[]
 for c in json.loads((P/'cases.json').read_text()):
  code=c['code'];latest=R/'runs'/code/'latest.json';s=json.loads(latest.read_text()) if latest.exists() else {'state':'not_started'}
- row=dict(code=code,group=c['group'],state=s['state'],natoms=s.get('natoms'),job_id=s.get('job_id'),shard=s.get('shard'),elapsed_seconds=s.get('elapsed_seconds'),returncode=s.get('returncode'),directory=s.get('directory'))
+ row=dict(code=code,group=c['group'],state=s['state'],natoms=s.get('natoms'),job_id=s.get('job_id'),shard=s.get('shard'),elapsed_seconds=s.get('elapsed_seconds'),returncode=s.get('returncode'),directory=s.get('directory'),failure_stage=s.get('failure_stage'),error=s.get('error'))
  row.update(s.get('result',{}));row['git_commit']=s.get('git_commit');row['state']=s['state'];row['converged']=s.get('result',{}).get('lbfgs_status')==0 if s['state']=='refined' else None
  if s.get('directory'):
   log=Path(s['directory'])/'refine.log'
@@ -20,7 +20,8 @@ for c in json.loads((P/'cases.json').read_text()):
    row[label+'_metrics_state']=d['state'];row[label+'_metric_errors']=';'.join(d.get('errors',{}))
    for k in ['r_work','r_free','cc_mask','emringer']:row[label+'_'+k]=d.get(k)
    g=d.get('geometry',{})
-   for name,key in [('bond','mean'),('angle','mean'),('clash','score')]:row[label+'_'+name+'_'+key]=(g.get(name) or {}).get(key)
+   for name,key in [('bond','mean'),('angle','mean'),('clash','score'),('ramachandran','outliers'),('rotamer','outliers')]:row[label+'_'+name+'_'+key]=(g.get(name) or {}).get(key)
+   row[label+'_molprobity_score']=g.get('molprobity_score')
  rows.append(row)
 fields=list(dict.fromkeys(k for row in rows for k in row))
 with (R/'summary.csv').open('w',newline='') as out:

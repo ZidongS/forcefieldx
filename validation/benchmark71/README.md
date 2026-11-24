@@ -77,3 +77,11 @@ failures use memory zero. Retry trajectories are saved every ten iterations.
 Diffraction calculations use four CPU threads after the initial serial batch;
 cryo-EM uses one. Four CPUs are allocated per GPU worker. Case metadata records
 the code revision and thread count. Completed serial results are preserved.
+
+Successful outputs additionally pass an atom-order, provenance, coordinate-only
+and numeric audit. The minimum distance between any two supplied output atoms,
+including optimized hydrogen atoms, must be at least 0.5 A; this is a gross
+collapse check, not a substitute for independent stereochemical validation.
+Rejected attempts and their structures are retained under history in the result
+archive. Metrics are associated with their exact output attempt and model hash.
+Run the final audit with `sbatch audit71.sbatch` (or `--partial` while running).
