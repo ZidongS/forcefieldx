@@ -1,0 +1,58 @@
+{
+  "energy_eV": -2081.734086897024,
+  "forces_eV_A": [
+    [
+      0.1343904390395675,
+      0.2067246291005862,
+      0.0
+    ],
+    [
+      0.07703889048916146,
+      -0.2052027109666859,
+      0.0
+    ],
+    [
+      -0.21142940403477625,
+      -0.001521903232980737,
+      0.0
+    ]
+  ],
+  "finite_difference_max_error_eV_A": 0.0011713046987334996,
+  "finite_difference": [
+    [
+      -0.133219134340834,
+      -0.20578390058290097,
+      0.0
+    ],
+    [
+      -0.07673350864934037,
+      0.2056728947081865,
+      0.0
+    ],
+    [
+      0.21230099969216099,
+      0.0008020272161957109,
+      0.0
+    ]
+  ],
+  "solvent": {
+    "model": "GBn2",
+    "nonpolar": "ACE",
+    "charge_source": "aux",
+    "forces_available": true,
+    "solvent_dielectric": 78.5,
+    "solute_dielectric": 1.0,
+    "surface_tension_kJ_mol_nm2": 2.25936,
+    "platform": "CUDA",
+    "requested_platform": "CUDA",
+    "precision": "double",
+    "charge_potential_method": "analytic_GB",
+    "parameters_source": "/home/shuzidong/workfile/alphadynamics/zidong_analysis_toolkit/AD_singlepoint_implicit/examples/water_parameters.json",
+    "charge_potential_backend": "Triton CUDA float64",
+    "dq_dR": true,
+    "fixed_charges": false,
+    "charge_step_e": null
+  },
+  "aux_response": "total",
+  "aux_evaluation": "single_forward"
+}

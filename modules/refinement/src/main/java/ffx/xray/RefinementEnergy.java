@@ -42,6 +42,7 @@ import ffx.algorithms.dynamics.thermostats.Thermostat;
 import ffx.crystal.Crystal;
 import ffx.crystal.CrystalPotential;
 import ffx.numerics.Potential;
+import ffx.potential.ADGBn2Potential;
 import ffx.potential.ForceFieldEnergy;
 import ffx.potential.MolecularAssembly;
 import ffx.potential.bonded.Atom;
@@ -104,6 +105,7 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
    * MolecularAssembly instances being refined.
    */
   private final MolecularAssembly[] molecularAssemblies;
+  private final Potential[] chemicalPotentials;
   /**
    * Atomic coordinates for computing the chemical energy.
    */
@@ -177,26 +179,55 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
     nOccupancy = refinementModel.getNumOccupancyParameters();
     n = nXYZ + nBFactor + nOccupancy;
 
-    // Initialize force field and Xray energies
-    for (MolecularAssembly molecularAssembly : molecularAssemblies) {
-      ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
-      if (forceFieldEnergy == null) {
-        forceFieldEnergy = ForceFieldEnergy.energyFactory(molecularAssembly);
-        molecularAssembly.setPotential(forceFieldEnergy);
+    // Select the chemical potential after assembly and atom mappings are finalized.
+    chemicalPotentials = new Potential[molecularAssemblies.length];
+    try {
+      for (int i = 0; i < molecularAssemblies.length; i++) {
+        MolecularAssembly molecularAssembly = molecularAssemblies[i];
+        if (molecularAssembly.getForceField().getBoolean("AD_GBN2", false)) {
+          var properties = molecularAssembly.getForceField().getProperties();
+          if (molecularAssembly.getForceField().getBoolean("LAMBDATERM", false)
+              || molecularAssembly.getForceField().getBoolean("NCSTERM", false)
+              || molecularAssembly.getForceField().getBoolean("COMRESTRAINTERM", false)
+              || properties.containsKey("constrain") || properties.containsKey("rattle")
+              || properties.containsKey("restrain-position")
+              || properties.containsKey("restrain-distance")
+              || properties.containsKey("restrain-torsion")
+              || properties.containsKey("restrain-groups")) {
+            throw new IllegalArgumentException("AD_GBN2 is incompatible with FFX chemical restraints, constraints or alchemy");
+          }
+          if (!refinementMode.includesCoordinates()) {
+            throw new IllegalArgumentException("AD_GBN2 requires coordinate refinement");
+          }
+          chemicalPotentials[i] = new ADGBn2Potential(molecularAssembly.getAtomArray(), molecularAssembly.getForceField());
+        } else {
+          ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
+          if (forceFieldEnergy == null) {
+            forceFieldEnergy = ForceFieldEnergy.energyFactory(molecularAssembly);
+            molecularAssembly.setPotential(forceFieldEnergy);
+          }
+          chemicalPotentials[i] = forceFieldEnergy;
+        }
+        chemicalPotentials[i].setScaling(null);
       }
-    }
 
-    if (dataContainer instanceof DiffractionData diffractionData) {
-      if (!diffractionData.getScaled()[0]) {
-        diffractionData.printStats();
+      if (dataContainer instanceof DiffractionData diffractionData) {
+        if (!diffractionData.getScaled()[0]) {
+          diffractionData.printStats();
+        }
+        dataEnergy = new XRayEnergy(diffractionData);
+        // We will handle parameter (un)scaling within this class.
+        dataEnergy.setScaling(null);
+      } else if (dataContainer instanceof RealSpaceData realSpaceData) {
+        dataEnergy = new RealSpaceEnergy(realSpaceData);
+        // We will handle parameter (un)scaling within this class.
+        dataEnergy.setScaling(null);
       }
-      dataEnergy = new XRayEnergy(diffractionData);
-      // We will handle parameter (un)scaling within this class.
-      dataEnergy.setScaling(null);
-    } else if (dataContainer instanceof RealSpaceData realSpaceData) {
-      dataEnergy = new RealSpaceEnergy(realSpaceData);
-      // We will handle parameter (un)scaling within this class.
-      dataEnergy.setScaling(null);
+    } catch (RuntimeException | Error ex) {
+      for (Potential potential : chemicalPotentials) {
+        if (potential instanceof ADGBn2Potential) potential.destroy();
+      }
+      throw ex;
     }
 
     int assemblySize = molecularAssemblies.length;
@@ -228,7 +259,11 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
    */
   @Override
   public boolean destroy() {
-    return dataEnergy.destroy();
+    boolean success = true;
+    for (Potential potential : chemicalPotentials) {
+      if (potential instanceof ADGBn2Potential) success &= potential.destroy();
+    }
+    return dataEnergy.destroy() && success;
   }
 
   /**
@@ -260,9 +295,9 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
     if (refinementMode.includesCoordinates()) {
       // Compute the chemical energy.
       for (int i = 0; i < numAssemblies; i++) {
-        ForceFieldEnergy forceFieldEnergy = molecularAssemblies[i].getPotentialEnergy();
-        forceFieldEnergy.getCoordinates(xChemical[i]);
-        double curE = forceFieldEnergy.energy(xChemical[i], print);
+        Potential chemicalPotential = chemicalPotentials[i];
+        chemicalPotential.getCoordinates(xChemical[i]);
+        double curE = chemicalPotential.energy(xChemical[i], print);
         e += curE;
       }
       e = e * kTScale / numAssemblies;
@@ -312,9 +347,9 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
       int numAssemblies = molecularAssemblies.length;
       // Compute the chemical energy and gradient.
       for (int i = 0; i < numAssemblies; i++) {
-        ForceFieldEnergy forceFieldEnergy = molecularAssemblies[i].getPotentialEnergy();
-        forceFieldEnergy.getCoordinates(xChemical[i]);
-        double curE = forceFieldEnergy.energyAndGradient(xChemical[i], gChemical[i], print);
+        Potential chemicalPotential = chemicalPotentials[i];
+        chemicalPotential.getCoordinates(xChemical[i]);
+        double curE = chemicalPotential.energyAndGradient(xChemical[i], gChemical[i], print);
         e += curE;
         // Aggregate the contribution of this conformer into the overall gradient.
         refinementModel.addAssemblyGradient(i, g);
@@ -432,9 +467,8 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
   @Override
   public void setEnergyTermState(STATE state) {
     this.state = state;
-    for (MolecularAssembly molecularAssembly : molecularAssemblies) {
-      ForceFieldEnergy fe = molecularAssembly.getPotentialEnergy();
-      fe.setEnergyTermState(state);
+    for (Potential chemicalPotential : chemicalPotentials) {
+      chemicalPotential.setEnergyTermState(state);
     }
     dataEnergy.setEnergyTermState(state);
   }
@@ -460,9 +494,11 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
    */
   @Override
   public void setLambda(double lambda) {
-    for (MolecularAssembly molecularAssembly : molecularAssemblies) {
-      ForceFieldEnergy forceFieldEnergy = molecularAssembly.getPotentialEnergy();
-      forceFieldEnergy.setLambda(lambda);
+    for (Potential chemicalPotential : chemicalPotentials) {
+      if (chemicalPotential instanceof ADGBn2Potential) {
+        throw new UnsupportedOperationException("AD_GBN2 does not implement lambda scaling");
+      }
+      ((ForceFieldEnergy) chemicalPotential).setLambda(lambda);
     }
     if (data instanceof DiffractionData) {
       XRayEnergy xRayEnergy = (XRayEnergy) dataEnergy;
@@ -541,13 +577,9 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
 
   @Override
   public List<Potential> getUnderlyingPotentials() {
-    Stream<Potential> directPEs =
-        Arrays.stream(molecularAssemblies).map(MolecularAssembly::getPotentialEnergy);
-    Stream<Potential> allPEs =
-        Arrays.stream(molecularAssemblies)
-            .map(MolecularAssembly::getPotentialEnergy)
-            .map(Potential::getUnderlyingPotentials)
-            .flatMap(List::stream);
+    Stream<Potential> directPEs = Arrays.stream(chemicalPotentials);
+    Stream<Potential> allPEs = Arrays.stream(chemicalPotentials)
+        .map(Potential::getUnderlyingPotentials).flatMap(List::stream);
     return Stream.concat(directPEs, allPEs).collect(Collectors.toList());
   }
 
@@ -582,8 +614,9 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
 
     // Compute the chemical energy and gradient.
     for (int i = 0; i < assemblysize; i++) {
-      ForceFieldEnergy forceFieldEnergy = molecularAssemblies[i].getPotentialEnergy();
-      double curE = forceFieldEnergy.getd2EdL2();
+      Potential chemicalPotential = chemicalPotentials[i];
+      double curE = chemicalPotential instanceof ADGBn2Potential ? 0.0
+          : ((ForceFieldEnergy) chemicalPotential).getd2EdL2();
       d2EdL2 += (curE - d2EdL2) / (i + 1);
     }
     d2EdL2 *= kTScale;
@@ -605,8 +638,9 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
 
     // Compute the chemical energy and gradient.
     for (int i = 0; i < assemblysize; i++) {
-      ForceFieldEnergy forceFieldEnergy = molecularAssemblies[i].getPotentialEnergy();
-      double curdEdL = forceFieldEnergy.getdEdL();
+      Potential chemicalPotential = chemicalPotentials[i];
+      double curdEdL = chemicalPotential instanceof ADGBn2Potential ? 0.0
+          : ((ForceFieldEnergy) chemicalPotential).getdEdL();
       dEdL += (curdEdL - dEdL) / (i + 1);
     }
     dEdL *= kTScale;
@@ -634,9 +668,10 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
 
     // Compute the chemical energy and gradient.
     for (int i = 0; i < assemblysize; i++) {
-      ForceFieldEnergy forcefieldEnergy = molecularAssemblies[i].getPotentialEnergy();
       Arrays.fill(gChemical[i], 0.0);
-      forcefieldEnergy.getdEdXdL(gChemical[i]);
+      if (!(chemicalPotentials[i] instanceof ADGBn2Potential)) {
+        ((ForceFieldEnergy) chemicalPotentials[i]).getdEdXdL(gChemical[i]);
+      }
     }
     for (int i = 0; i < assemblysize; i++) {
       for (int j = 0; j < nXYZ; j++) {
