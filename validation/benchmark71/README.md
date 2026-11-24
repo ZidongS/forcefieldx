@@ -58,3 +58,9 @@ sbatch evaluate71.sbatch 1
 
 Generated structures, input data, logs and environments are excluded from Git.
 Read `RESULTS.md` for the executed protocol, jobs, and measured outcomes.
+
+Failed L-BFGS cases can be retried with `retry71.sbatch CODE`. The separate
+`FFXRefine71Retry` entry uses steepest descent (L-BFGS memory zero) with the
+same potential, data weight, gradient tolerance and iteration cap. Its outputs
+explicitly record the optimizer and preserve the failed attempt. The retry
+uses a separate class directory so running production callers stay fixed.

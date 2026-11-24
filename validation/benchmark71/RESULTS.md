@@ -38,3 +38,8 @@ The derivative check additionally considers steps 0.003 and 0.01 A with the
 same 0.15 + 2% agreement criterion. 8g94 passed this check and completed its
 5-step validation (24874). Earlier production attempts (24870/24871) remain
 recorded; they are not counted as successful refinements.
+
+6wik failed its first production L-BFGS run after a rapid target decrease and
+gradient explosion (iteration 138). It is excluded from successful cases.
+A same-potential steepest-descent retry is queued as job 24885, dependent on
+completion of production shard 24877, keeping the task within two GPUs.
