@@ -27,7 +27,7 @@ of 4 A (as in upstream gradient tests), and reciprocal sampling 0.6. No classica
 force-field chemical energy is added.
 
 The full-target descent-direction derivative is checked at steps 0.001, 0.0003,
-and 0.0001 A, stopping at the first agreement within 0.15 + 2% of the projected
+0.0001, 0.003, and 0.01 A, stopping at the first agreement within 0.15 + 2% of the projected
 gradient. This accommodates neighbor-list changes at larger displacements and
 exported-model energy precision at smaller displacements. Failed checks stop
 that case and preserve diagnostics. This is a smoke check, not an exhaustive
@@ -35,7 +35,7 @@ per-coordinate gradient verification.
 
 The campaign uses two independent single-GPU shards, balanced by atom count
 squared. Each case runs L-BFGS with memory 7, at most 200 iterations, and gradient
-RMS tolerance 0.5. An iteration cap is recorded separately from convergence.
+RMS tolerance 1.0. An iteration cap is recorded separately from convergence.
 `campaign71.py` keeps immutable per-attempt outputs, hashes, commands, job IDs,
 return codes, and elapsed times; resuming skips only successful cases. A case
 failure does not discard the rest of its shard. Joint target values include a

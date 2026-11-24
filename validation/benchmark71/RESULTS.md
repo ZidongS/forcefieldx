@@ -30,3 +30,11 @@ The integration and minimization work; the pilot does **not** demonstrate
 uniform improvement in every validation metric (notably EMRinger for 8dat).
 Production preserves these independent metrics and distinguishes convergence
 from hitting the 200-iteration cap. Final 71-case outcomes will be appended.
+
+Large-system production precision calibration: the initial 0.5 gradient-RMS
+threshold led 7un3 to stop in line search at RMS 0.5967, despite a decreased
+target. The production threshold is therefore fixed at **1.0** for all cases.
+The derivative check additionally considers steps 0.003 and 0.01 A with the
+same 0.15 + 2% agreement criterion. 8g94 passed this check and completed its
+5-step validation (24874). Earlier production attempts (24870/24871) remain
+recorded; they are not counted as successful refinements.

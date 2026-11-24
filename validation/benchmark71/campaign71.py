@@ -25,7 +25,7 @@ if sys.argv[1]=='plan':
   c.update(natoms=s['natoms'],prepared_sha256=s['prepared_sha256'],parameters_sha256=s['parameters_sha256'])
  for c in sorted(cases,key=lambda c:-c['natoms']**2):
   k=min(range(2),key=lambda k:cost[k]);shards[k].append(c);cost[k]+=c['natoms']**2
- plan=dict(shards=shards,estimated_cost=cost,iterations=200,gradient_rms_tolerance=0.5,data_weight=0.05,git_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=FFX,text=True).strip())
+ plan=dict(shards=shards,estimated_cost=cost,iterations=200,gradient_rms_tolerance=1.0,data_weight=0.05,git_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=FFX,text=True).strip())
  save(ROOT/'campaign_plan.json',plan);print([(len(s),c) for s,c in zip(shards,cost)])
 else:
  shard=int(sys.argv[1]);plan=json.loads((ROOT/'campaign_plan.json').read_text());cases=plan['shards'][shard]

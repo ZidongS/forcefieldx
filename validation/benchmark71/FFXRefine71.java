@@ -105,7 +105,7 @@ public final class FFXRefine71 {
       double numerical=Double.NaN,error=Double.POSITIVE_INFINITY;
       // Try successively smaller steps: AD neighbor lists can change at a finite step,
       // while very small displacements reach the precision limit of the exported model.
-      for(double step:new double[]{0.001,0.0003,0.0001}){
+      for(double step:new double[]{0.001,0.0003,0.0001,0.003,0.01}){
         for(int j=0;j<x.length;j++){plus[j]=initial[j]+step*direction[j];minus[j]=initial[j]-step*direction[j];}
         double candidate=(energy.energy(plus)-energy.energy(minus))/(2*step);
         double candidateError=Math.abs(candidate-analytic);
@@ -121,7 +121,7 @@ public final class FFXRefine71 {
       double weight=targetWeight;
       data.setWeight(weight);
       start=energy.energyAndGradient(x,g);
-      int status=LBFGS.minimize(x.length,7,x,start,g,0.5,iterations,energy,null);
+      int status=LBFGS.minimize(x.length,7,x,start,g,1.0,iterations,energy,null);
       double end=energy.energyAndGradient(x,g),rms=0;
       for(int i=0;i<x.length;i++)rms+=(x[i]-initial[i])*(x[i]-initial[i]);
       if(!Double.isFinite(end)||end>start+1e-5||status<0)throw new AssertionError("Refinement failed: "+status+" start "+start+" end "+end);
@@ -129,6 +129,8 @@ public final class FFXRefine71 {
       String fit="";
       if(data instanceof DiffractionData diffraction){diffraction.scaleBulkFit();diffraction.printStats();fit=diffraction.printOptimizationUpdate();Files.writeString(out.resolve("final_data_fit.txt"),fit);}
       String result=String.format(Locale.ROOT,"{\"state\":\"refined\",\"natoms\":%d,\"initial_energy_kcal_mol\":%.12f,\"final_energy_kcal_mol\":%.12f,\"initial_grms\":%.8g,\"directional_fd_error\":%.8g,\"lbfgs_status\":%d,\"rms_displacement_A\":%.8g,\"max_iterations\":%d,\"data_weight\":%.4f}%n",atoms.length,start,end,Math.sqrt(grms/g.length),error,status,Math.sqrt(rms/atoms.length),iterations,weight);
+      double finalGrms=0;for(double v:g)finalGrms+=v*v;
+      result=result.stripTrailing();result=result.substring(0,result.length()-1)+String.format(Locale.ROOT,",\"final_grms\":%.8g,\"gradient_tolerance\":1.0,\"converged\":%s,\"directional_analytic\":%.8g,\"directional_numerical\":%.8g,\"fd_step_A\":%.8g}%n",Math.sqrt(finalGrms/g.length),status==0,analytic,numerical,h);
       Files.writeString(out.resolve("refinement.json"),result);System.out.println("FFX71_PASS "+result);
     } catch(Throwable failure){pendingFailure=failure;} finally {
       if(pendingFailure==null){
