@@ -1,0 +1,60 @@
+# FFX AD+GBn2 coordinate refinement: 71-case campaign
+
+The archive is `validation/AD_GBn2_71_test_package.zip`, SHA256
+`e85483cd063e134c08b6e46d4b2fbba7fd54f056ee683d4ea8e3964357a2d3e6`.
+All source-manifest hashes are checked before preparation. There are 41 cryo-EM,
+20 low-resolution X-ray, and 10 high-resolution X-ray cases.
+
+`prepare71.py` uses preparations of the **original packaged input**, after matching
+its SHA256, from the existing Q|R preparation environment. It never starts from
+historical refined or author coordinates. OpenMM GBn2 parameters and CCTBX formal
+charges are generated for the exact resulting atom order. The worker replaces the
+placeholder charge array with AUX charges and includes the full charge response.
+
+The three initial H-contact exceptions (8dl8, 1wl3, 4jp6) retain qmready protonation,
+caps and water hydrogens. `reduce_record_h_contact.py` records only the final
+H-contact validation exception; heavy-atom errors and coincident atoms remain
+fatal. These initial contacts are recorded in the preparation logs. For 3njw,
+the highest mean-occupancy conformer is selected per residue (alphabetical tie
+break), its occupancy becomes one, and matching ANISOU records are preserved.
+Every choice is recorded in `prepared/<code>/status.json`.
+
+`FFXRefine71.java` preserves atom identity and invokes the integrated FFX
+`RefinementEnergy`, combining AD+GBn2 with `RealSpaceData` or `DiffractionData`.
+B factors, anisotropic tensors and occupancies are held fixed. X-ray uses the
+polynomial bulk-solvent mask, Bondi radii for that mask only, a scattering buffer
+of 4 A (as in upstream gradient tests), and reciprocal sampling 0.6. No classical
+force-field chemical energy is added.
+
+The full-target descent-direction derivative is checked at steps 0.001, 0.0003,
+and 0.0001 A, stopping at the first agreement within 0.15 + 2% of the projected
+gradient. This accommodates neighbor-list changes at larger displacements and
+exported-model energy precision at smaller displacements. Failed checks stop
+that case and preserve diagnostics. This is a smoke check, not an exhaustive
+per-coordinate gradient verification.
+
+The campaign uses two independent single-GPU shards, balanced by atom count
+squared. Each case runs L-BFGS with memory 7, at most 200 iterations, and gradient
+RMS tolerance 0.5. An iteration cap is recorded separately from convergence.
+`campaign71.py` keeps immutable per-attempt outputs, hashes, commands, job IDs,
+return codes, and elapsed times; resuming skips only successful cases. A case
+failure does not discard the rest of its shard. Joint target values include a
+weighted experimental term and must not be interpreted as standalone chemical
+energies or compared across systems.
+
+Independent CCTBX evaluation (`evaluate71.py`) measures geometry, CCmask/EMRinger
+or Rwork/Rfree for the original, prepared, and final model. Rfree is used only
+for reporting, never for choosing weights or stopping optimization. Metrics
+errors are retained separately from refinement failures.
+
+```bash
+python3 campaign71.py plan
+sbatch shard71.sbatch 0
+sbatch shard71.sbatch 1
+# After refinement, evaluate with CPU-only jobs:
+sbatch evaluate71.sbatch 0
+sbatch evaluate71.sbatch 1
+```
+
+Generated structures, input data, logs and environments are excluded from Git.
+Read `RESULTS.md` for the executed protocol, jobs, and measured outcomes.

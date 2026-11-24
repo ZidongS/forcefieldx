@@ -606,8 +606,8 @@ public class RealSpaceData implements DataContainer {
         sharedTarget[i] = new SharedDouble();
       }
       shareddUdL = new SharedDouble();
-      gradient = new AtomicDoubleArray3D(AtomicDoubleArrayImpl.MULTI, nThreads, nAtoms);
-      lambdaGrad = new AtomicDoubleArray3D(AtomicDoubleArrayImpl.MULTI, nThreads, nAtoms);
+      gradient = new AtomicDoubleArray3D(AtomicDoubleArrayImpl.MULTI, nAtoms, nThreads);
+      lambdaGrad = new AtomicDoubleArray3D(AtomicDoubleArrayImpl.MULTI, nAtoms, nThreads);
     }
 
     @Override

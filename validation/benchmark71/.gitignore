@@ -1,0 +1,8 @@
+*
+!.gitignore
+!*.py
+!*.java
+!*.sbatch
+!README.md
+!RESULTS.md
+!summary.csv
