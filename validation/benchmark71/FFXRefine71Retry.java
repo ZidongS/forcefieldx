@@ -121,7 +121,16 @@ public final class FFXRefine71Retry {
       double weight=targetWeight;
       data.setWeight(weight);
       start=energy.energyAndGradient(x,g);
-      int status=LBFGS.minimize(x.length,0,x,start,g,1.0,iterations,energy,null);
+      int status=LBFGS.minimize(x.length,0,x,start,g,1.0,iterations,energy,
+          (iter, memory, evaluations, gradientRms, coordinateRms, value, delta, angle, info) -> {
+            System.out.printf(Locale.ROOT,"INFO: %d%.4f %.4f RETRY %s%n",iter,value,gradientRms,info);
+            if(iter%10==0){
+              try{Files.createDirectories(out.resolve("trajectory"));
+                writePdb(pdb,atoms,out.resolve("trajectory").resolve(String.format("step%03d.pdb",iter)));
+              }catch(Exception failure){throw new IllegalStateException("Could not save retry trajectory",failure);}
+            }
+            return true;
+          });
       double end=energy.energyAndGradient(x,g),rms=0;
       for(int i=0;i<x.length;i++)rms+=(x[i]-initial[i])*(x[i]-initial[i]);
       if(!Double.isFinite(end)||end>start+1e-5||status<0)throw new AssertionError("Refinement failed: "+status+" start "+start+" end "+end);
