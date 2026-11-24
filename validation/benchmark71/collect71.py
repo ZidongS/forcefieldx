@@ -11,11 +11,13 @@ for c in json.loads((P/'cases.json').read_text()):
   log=Path(s['directory'])/'refine.log'
   if log.exists():
    matches=re.findall(r'INFO:\s+(\d+)\s*(-\d+\.\d+)\s+(\d+\.\d+)',log.read_text(errors='replace'))
-   if matches:row['iterations_completed']=int(matches[-1][0]);row['final_grms']=float(matches[-1][2])
+   if matches:row['iterations_completed']=int(matches[-1][0]);row.setdefault('final_grms',float(matches[-1][2]))
  for label in ['original','prepared','ffx_ad_gbn2']:
   p=R/'metrics'/code/(label+'.json')
   if p.exists():
-   d=json.loads(p.read_text());row[label+'_metrics_state']=d['state'];row[label+'_metric_errors']=';'.join(d.get('errors',{}))
+   d=json.loads(p.read_text())
+   if label=='ffx_ad_gbn2' and (s['state']!='refined' or d.get('pdb')!=str(Path(s['directory'])/'refined.pdb')):continue
+   row[label+'_metrics_state']=d['state'];row[label+'_metric_errors']=';'.join(d.get('errors',{}))
    for k in ['r_work','r_free','cc_mask','emringer']:row[label+'_'+k]=d.get(k)
    g=d.get('geometry',{})
    for name,key in [('bond','mean'),('angle','mean'),('clash','score')]:row[label+'_'+name+'_'+key]=(g.get(name) or {}).get(key)
@@ -23,5 +25,5 @@ for c in json.loads((P/'cases.json').read_text()):
 fields=list(dict.fromkeys(k for row in rows for k in row))
 with (R/'summary.csv').open('w',newline='') as out:
  w=csv.DictWriter(out,fieldnames=fields);w.writeheader();w.writerows(rows)
-summary=dict(total=len(rows),states=dict(collections.Counter(r['state'] for r in rows)),groups={g:dict(collections.Counter(r['state'] for r in rows if r['group']==g)) for g in sorted({r['group'] for r in rows})},converged=sum(r['converged'] is True for r in rows),iteration_capped=sum(r.get('iterations_completed')==200 for r in rows),failed=[r['code'] for r in rows if r['state']=='failed'])
+summary=dict(total=len(rows),states=dict(collections.Counter(r['state'] for r in rows)),groups={g:dict(collections.Counter(r['state'] for r in rows if r['group']==g)) for g in sorted({r['group'] for r in rows})},converged=sum(r['converged'] is True for r in rows),iteration_capped=sum(r['state']=='refined' and r.get('iterations_completed')==200 and not r.get('converged') for r in rows),failed=[r['code'] for r in rows if r['state']=='failed'])
 (R/'summary.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))

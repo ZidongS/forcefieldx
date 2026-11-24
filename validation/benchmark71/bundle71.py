@@ -6,7 +6,7 @@ summary=json.loads((R/'summary.json').read_text());assert summary['total']==71 a
 audit=json.loads((R/'audit.json').read_text());assert not audit['errors'] and audit['passed']==summary['states'].get('refined',0)
 out=R/'FFX_AD_GBn2_71_results.zip'
 with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:
- for name in ['summary.csv','summary.json','audit.json','campaign_plan.json','runtime_provenance.json','README.md','RESULTS.md']:
+ for name in ['summary.csv','summary.json','audit.json','campaign_plan.json','runtime_provenance.json','measured_statistics.json','README.md','RESULTS.md']:
   z.write(R/name,name)
  for p in sorted((R/'runs').glob('*/latest.json')):
   s=json.loads(p.read_text());dest=Path(s['directory']);code=s['code']
@@ -18,7 +18,7 @@ with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) a
   for f in (dest/'trajectory').glob('*.pdb'):z.write(f,f'{category}/{code}/trajectory/{f.name}')
   for old in p.parent.glob('attempt*'):
    if old==dest:continue
-   for name in ['status.json','refine.log','refinement.json']:
+   for name in ['status.json','refine.log','refinement.json','refined.pdb']:
     f=old/name
     if f.exists():z.write(f,f'history/{code}/{old.name}/{name}')
   prep=R/'prepared'/code

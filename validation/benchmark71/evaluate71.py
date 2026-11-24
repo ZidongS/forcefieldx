@@ -1,5 +1,5 @@
 """Independent metrics; never use author or historical refined coordinates as input."""
-import json,sys,subprocess,time
+import json,sys,subprocess,time,hashlib
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent;FFX=ROOT.parents[1];PACKAGE=FFX/'validation/AD_GBn2_71_test_package'
 entry=FFX.parent/'AQuaRef/development_20261124_full71/evaluation_entry.sh'
@@ -15,10 +15,14 @@ for c in plan['shards'][shard]:
   if state['state']=='refined':models['ffx_ad_gbn2']=Path(state['directory'])/'refined.pdb'
  for label,pdb in models.items():
   target=out/(label+'.json')
-  if target.exists():continue
+  if target.exists():
+   previous=json.loads(target.read_text())
+   if previous.get('pdb')==str(pdb) and (not previous.get('model_sha256') or previous['model_sha256']==hashlib.sha256(pdb.read_bytes()).hexdigest()):continue
+   target.rename(out/(label+'.stale.'+str(int(time.time()))+'.json'))
   with (out/(label+'.log')).open('w') as log:
    try:
     rc=subprocess.run(['bash',str(entry),str(spec),label,str(pdb),str(out)],stdout=log,stderr=subprocess.STDOUT,timeout=1800).returncode
    except subprocess.TimeoutExpired:rc=124
   if not target.exists():target.write_text(json.dumps(dict(state='failed',returncode=rc,code=code,label=label)))
-  print(code,label,json.loads(target.read_text()).get('state'),flush=True)
+  record=json.loads(target.read_text());record['model_sha256']=hashlib.sha256(pdb.read_bytes()).hexdigest();target.write_text(json.dumps(record,indent=2))
+  print(code,label,record.get('state'),flush=True)

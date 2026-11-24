@@ -27,7 +27,13 @@ for code in codes:
    try:rc=p.wait(timeout=6*3600)
    except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);rc=124
   s['returncode']=rc;assert rc==0,f'FFX exit {rc}'
-  result=json.loads((dest/'refinement.json').read_text());assert result['state']=='refined';s.update(state='refined',result=result,refined_sha256=sha(dest/'refined.pdb'))
+  result=json.loads((dest/'refinement.json').read_text());assert result['state']=='refined'
+  from scipy.spatial import cKDTree
+  xyz=[[float(line[j:j+8]) for j in (30,38,46)] for line in (dest/'refined.pdb').read_text().splitlines() if line.startswith(('ATOM  ','HETATM'))]
+  minimum=float(cKDTree(xyz).query(xyz,k=2)[0][:,1].min())
+  s['minimum_distance_A']=minimum
+  assert minimum>=0.5,f'Output geometry audit: minimum atom distance {minimum:.6f} A < 0.5 A'
+  s.update(state='refined',result=result,refined_sha256=sha(dest/'refined.pdb'))
  except Exception:s.update(state='failed',error=traceback.format_exc());failed.append(code)
  s['elapsed_seconds']=time.time()-s['started'];save(dest/'status.json',s);save(latest,s);print(json.dumps(s),flush=True)
 if failed:sys.exit(1)
