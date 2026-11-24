@@ -31,6 +31,9 @@ From the FFX checkout, submit `sbatch validation/ad_gbn2/build.sbatch` and wait
 for `BUILD SUCCESS`. Then submit `sbatch validation/ad_gbn2/java_smoke.sbatch`.
 The scripts discover the Java 25 installation in the sibling `.ffx-tools`
 directory. GPU calculations use the existing `AD` conda environment.
+On headless Debian nodes, run `bash validation/ad_gbn2/setup_xvfb.sh` once
+to prepare user-local Xvfb/XKB libraries. The GPU script starts a virtual
+display for FFX Java3D initialization. This does not open a visible desktop.
 For an independent Python reference, run
 `sbatch validation/ad_gbn2/direct.sbatch` from `validation/ad_gbn2`.
 
@@ -60,3 +63,7 @@ directly. This backend does not add FFX chemical restraint energies, and the
 refinement constructor rejects configured restraints, constraints, and
 lambda-dependent chemical terms. The Python toolkit and model weights stay
 external to this repository.
+
+Validation completed on 2026-11-25: full reactor build and the CUDA Java
+smoke/combined refinement test passed. See `validation/ad_gbn2/RESULTS.md`
+for job IDs, tolerances, numerical results and the validation scope.
