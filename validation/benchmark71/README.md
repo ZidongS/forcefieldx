@@ -73,3 +73,7 @@ The CSV preserves these raw field names; reports label them as RMS deviations.
 derivative-check-only failure it retains L-BFGS memory 7 and additionally
 checks steps 0.03 and 0.00003 A at the unchanged error criterion; optimization
 failures use memory zero. Retry trajectories are saved every ten iterations.
+
+Diffraction calculations use four CPU threads after the initial serial batch;
+cryo-EM uses one. Four CPUs are allocated per GPU worker. Case metadata records
+the code revision and thread count. Completed serial results are preserved.

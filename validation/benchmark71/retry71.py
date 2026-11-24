@@ -20,7 +20,8 @@ for code in codes:
  save(latest,s)
  try:
   prep=R/'prepared'/code;assert sha(prep/'prepared.pdb')==c['prepared_sha256'];assert sha(prep/'parameters.json')==c['parameters_sha256']
-  cmd=['xvfb-run','-a','java','-Dpj.nt=1',f'-Dffx71.memory={memory}','--enable-native-access=ALL-UNNAMED','--add-modules','jdk.incubator.vector','-Xmx16g','-cp',os.environ['FFX71_CP'],'ffx.potential.FFXRefine71Retry',str(F),str(prep),str(P/c['data']),str(dest),c['group'],'200'];s['command']=cmd;save(latest,s)
+  threads=1 if c['group']=='cryoem' else 4
+  cmd=['xvfb-run','-a','java',f'-Dpj.nt={threads}',f'-Dffx71.threads={threads}',f'-Dffx71.memory={memory}','--enable-native-access=ALL-UNNAMED','--add-modules','jdk.incubator.vector','-Xmx16g','-cp',os.environ['FFX71_CP'],'ffx.potential.FFXRefine71Retry',str(F),str(prep),str(P/c['data']),str(dest),c['group'],'200'];s['command']=cmd;save(latest,s)
   with (dest/'refine.log').open('w') as log:
    p=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
    try:rc=p.wait(timeout=6*3600)

@@ -40,7 +40,8 @@ else:
   try:
    assert sha(prep/'prepared.pdb')==c['prepared_sha256']
    assert sha(prep/'parameters.json')==c['parameters_sha256']
-   command=['xvfb-run','-a','java','-Dpj.nt=1','-Dffx71.sampling=0.6','--enable-native-access=ALL-UNNAMED','--add-modules','jdk.incubator.vector','-Xmx16g','-cp',cp,'ffx.potential.FFXRefine71',str(FFX),str(prep),str(PACKAGE/c['data']),str(attempt),c['group'],str(plan['iterations'])]
+   threads=1 if c['group']=='cryoem' else 4
+   command=['xvfb-run','-a','java',f'-Dpj.nt={threads}',f'-Dffx71.threads={threads}','-Dffx71.sampling=0.6','--enable-native-access=ALL-UNNAMED','--add-modules','jdk.incubator.vector','-Xmx16g','-cp',cp,'ffx.potential.FFXRefine71',str(FFX),str(prep),str(PACKAGE/c['data']),str(attempt),c['group'],str(plan['iterations'])]
    state['command']=command;save(latest,state)
    rc=run(command,attempt/'refine.log',6*3600);state['returncode']=rc
    assert rc==0,f'FFX exit {rc}'

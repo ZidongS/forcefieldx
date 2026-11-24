@@ -70,7 +70,8 @@ public final class FFXRefine71 {
     ff.addProperty("AD_TOOLKIT","/home/shuzidong/workfile/alphadynamics/zidong_analysis_toolkit");
     ff.addProperty("AD_PARAMETERS",prep.resolve("parameters.json").toString());
     ff.addProperty("AD_CHARGE",Files.readString(prep.resolve("charge.txt")).trim());
-    ParallelTeam team=new ParallelTeam(1);
+    int experimentalThreads=Integer.getInteger("ffx71.threads",group.equals("cryoem")?1:4);
+    ParallelTeam team=new ParallelTeam(experimentalThreads);
     MolecularAssembly assembly=new MolecularAssembly("AD benchmark") {
       @Override public Atom[] getAtomArray(){return atoms.clone();}
       @Override public Atom[] getActiveAtomArray(){return atoms.clone();}
@@ -131,6 +132,7 @@ public final class FFXRefine71 {
       String result=String.format(Locale.ROOT,"{\"state\":\"refined\",\"natoms\":%d,\"initial_energy_kcal_mol\":%.12f,\"final_energy_kcal_mol\":%.12f,\"initial_grms\":%.8g,\"directional_fd_error\":%.8g,\"lbfgs_status\":%d,\"rms_displacement_A\":%.8g,\"max_iterations\":%d,\"data_weight\":%.4f}%n",atoms.length,start,end,Math.sqrt(grms/g.length),error,status,Math.sqrt(rms/atoms.length),iterations,weight);
       double finalGrms=0;for(double v:g)finalGrms+=v*v;
       result=result.stripTrailing();result=result.substring(0,result.length()-1)+String.format(Locale.ROOT,",\"final_grms\":%.8g,\"gradient_tolerance\":1.0,\"converged\":%s,\"directional_analytic\":%.8g,\"directional_numerical\":%.8g,\"fd_step_A\":%.8g}%n",Math.sqrt(finalGrms/g.length),status==0,analytic,numerical,h);
+      result=result.stripTrailing();result=result.substring(0,result.length()-1)+",\"experimental_threads\":"+experimentalThreads+"}\n";
       Files.writeString(out.resolve("refinement.json"),result);System.out.println("FFX71_PASS "+result);
     } catch(Throwable failure){pendingFailure=failure;} finally {
       if(pendingFailure==null){

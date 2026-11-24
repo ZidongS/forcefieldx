@@ -6,7 +6,7 @@ rows=[]
 for c in json.loads((P/'cases.json').read_text()):
  code=c['code'];latest=R/'runs'/code/'latest.json';s=json.loads(latest.read_text()) if latest.exists() else {'state':'not_started'}
  row=dict(code=code,group=c['group'],state=s['state'],natoms=s.get('natoms'),job_id=s.get('job_id'),shard=s.get('shard'),elapsed_seconds=s.get('elapsed_seconds'),returncode=s.get('returncode'),directory=s.get('directory'))
- row.update(s.get('result',{}));row['state']=s['state'];row['converged']=s.get('result',{}).get('lbfgs_status')==0 if s['state']=='refined' else None
+ row.update(s.get('result',{}));row['git_commit']=s.get('git_commit');row['state']=s['state'];row['converged']=s.get('result',{}).get('lbfgs_status')==0 if s['state']=='refined' else None
  if s.get('directory'):
   log=Path(s['directory'])/'refine.log'
   if log.exists():
