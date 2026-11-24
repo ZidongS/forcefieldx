@@ -105,7 +105,7 @@ public final class FFXRefine71Retry {
       double numerical=Double.NaN,error=Double.POSITIVE_INFINITY;
       // Try successively smaller steps: AD neighbor lists can change at a finite step,
       // while very small displacements reach the precision limit of the exported model.
-      for(double step:new double[]{0.001,0.0003,0.0001,0.003,0.01}){
+      for(double step:new double[]{0.001,0.0003,0.0001,0.003,0.01,0.03,0.00003}){
         for(int j=0;j<x.length;j++){plus[j]=initial[j]+step*direction[j];minus[j]=initial[j]-step*direction[j];}
         double candidate=(energy.energy(plus)-energy.energy(minus))/(2*step);
         double candidateError=Math.abs(candidate-analytic);
@@ -121,7 +121,8 @@ public final class FFXRefine71Retry {
       double weight=targetWeight;
       data.setWeight(weight);
       start=energy.energyAndGradient(x,g);
-      int status=LBFGS.minimize(x.length,0,x,start,g,1.0,iterations,energy,
+      int history=Integer.getInteger("ffx71.memory",0);
+      int status=LBFGS.minimize(x.length,history,x,start,g,1.0,iterations,energy,
           (iter, memory, evaluations, gradientRms, coordinateRms, value, delta, angle, info) -> {
             System.out.printf(Locale.ROOT,"INFO: %d%.4f %.4f RETRY %s%n",iter,value,gradientRms,info);
             if(iter%10==0){
@@ -140,7 +141,7 @@ public final class FFXRefine71Retry {
       String result=String.format(Locale.ROOT,"{\"state\":\"refined\",\"natoms\":%d,\"initial_energy_kcal_mol\":%.12f,\"final_energy_kcal_mol\":%.12f,\"initial_grms\":%.8g,\"directional_fd_error\":%.8g,\"lbfgs_status\":%d,\"rms_displacement_A\":%.8g,\"max_iterations\":%d,\"data_weight\":%.4f}%n",atoms.length,start,end,Math.sqrt(grms/g.length),error,status,Math.sqrt(rms/atoms.length),iterations,weight);
       double finalGrms=0;for(double v:g)finalGrms+=v*v;
       result=result.stripTrailing();result=result.substring(0,result.length()-1)+String.format(Locale.ROOT,",\"final_grms\":%.8g,\"gradient_tolerance\":1.0,\"converged\":%s,\"directional_analytic\":%.8g,\"directional_numerical\":%.8g,\"fd_step_A\":%.8g}%n",Math.sqrt(finalGrms/g.length),status==0,analytic,numerical,h);
-      result=result.stripTrailing();result=result.substring(0,result.length()-1)+",\"optimizer\":\"steepest_descent\",\"lbfgs_memory\":0}\n";
+      result=result.stripTrailing();result=result.substring(0,result.length()-1)+String.format(Locale.ROOT,",\"optimizer\":\"%s\",\"lbfgs_memory\":%d}%n",history==0?"steepest_descent":"lbfgs",history);
       Files.writeString(out.resolve("refinement.json"),result);System.out.println("FFX71_PASS "+result);
     } catch(Throwable failure){pendingFailure=failure;} finally {
       if(pendingFailure==null){

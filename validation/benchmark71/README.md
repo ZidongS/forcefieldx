@@ -64,3 +64,12 @@ Failed L-BFGS cases can be retried with `retry71.sbatch CODE`. The separate
 same potential, data weight, gradient tolerance and iteration cap. Its outputs
 explicitly record the optimizer and preserve the failed attempt. The retry
 uses a separate class directory so running production callers stay fixed.
+
+CCTBX's geometry fields `bond.mean` and `angle.mean` are RMS deviations
+(as implemented by geometry_restraints.energies), despite their field names.
+The CSV preserves these raw field names; reports label them as RMS deviations.
+
+`retry71.sbatch --failed` discovers terminal failures when it starts. For a
+derivative-check-only failure it retains L-BFGS memory 7 and additionally
+checks steps 0.03 and 0.00003 A at the unchanged error criterion; optimization
+failures use memory zero. Retry trajectories are saved every ten iterations.
