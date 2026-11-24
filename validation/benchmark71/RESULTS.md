@@ -39,11 +39,48 @@ same 0.15 + 2% agreement criterion. 8g94 passed this check and completed its
 5-step validation (24874). Earlier production attempts (24870/24871) remain
 recorded; they are not counted as successful refinements.
 
-6wik failed its first production L-BFGS run after a rapid target decrease and
-gradient explosion (iteration 138). It is excluded from successful cases.
-A same-potential steepest-descent retry is queued as job 24885, dependent on
-completion of production shard 24877, keeping the task within two GPUs.
+6wik failed its initial L-BFGS runs with a target collapse and gradient explosion.
+Its same-target steepest-descent retry produced an audited output at 200 steps,
+but did not converge (final gradient RMS 12.957347). 6zm8 also reached the cap
+(final gradient RMS 2.1777804). These two outputs are explicitly nonconverged.
 
-1u87 stopped before optimization at its derivative check. Its separate
-diagnostics show agreement at step 0.03 A; it is included in the retry pass
-with the original L-BFGS optimizer and unchanged derivative-error criterion.
+2jcl's first capped L-BFGS output had a 0.258925 A H-H contact; the next
+L-BFGS run ended with gradient RMS 38.404769. Both were rejected, and the
+same-target steepest-descent retry also failed line search. All attempts are
+retained. 1u87's check-only failure was resolved at a 0.03 A derivative-check
+step without changing the original agreement criterion or L-BFGS optimizer.
+
+The final failed cases are 1tt8, 2fma, 2jcl, 2pnd, 3njw, 4jp6, 4o8h,
+4r5r, 4xcr, and 6dkz. Nine stopped during coordinate line search; 4xcr
+encountered StackOverflowError in FFX's recursive line search during initial
+experimental spline-scale fitting, before AD coordinate optimization.
+Several high-resolution cases still fail with both L-BFGS and steepest descent;
+this campaign therefore establishes a working integration but not robust
+convergence over all 71 cases. No tolerance relaxation or classical force-field
+substitution was used to convert those failures into successes.
+
+Successful audit checks are structural/provenance and numeric checks, not a
+claim of biological quality. In particular 6wik's capped output has bond RMS
+deviation 0.03859 A (prepared 0.02023 A), and a maximum bond deviation 2.296 A;
+its geometry must be reviewed before downstream use. Preserve capped outputs
+separately when selecting models for further scientific analysis.
+
+## Full 71-case results
+
+All 71 cases reached a terminal state: {'refined': 61, 'failed': 10}. Atom identity, non-coordinate records, hashes, finite/noncoincident coordinates, minimum atom distance >=0.5 A, decreased target and derivative-check acceptance passed the final audit for 61 successful cases.
+
+Converged: 59; reached the 200-iteration cap: 2; failed cases: ['4xcr', '2jcl', '2pnd', '4jp6', '4r5r', '4o8h', '6dkz', '3njw', '2fma', '1tt8'].
+
+Production code commit: `414e5b9e59e688bab6e4f1118a87c66607baee21`. Fixed data weight 0.05; gradient RMS tolerance 1.0; coordinate-only optimization. Slurm jobs recorded in final case states: 24877, 24878, 24888, 24889, 24892, 24901, 24902, 24904.
+
+| Group | Refined | Converged | Data-fit pairs | Improved | Median change |
+|---|---:|---:|---:|---:|---:|
+| cryoem | 41 | 40 | 41 | 16 | -0.00067 |
+| xray_low | 18 | 18 | 18 | 17 | -0.01144 |
+| xray_high | 2 | 1 | 2 | 2 | -0.02071 |
+
+Changes are final minus prepared: higher CCmask and lower Rfree indicate better data fit. These independent metrics do not all improve; the CSV retains every result, including geometry and EMRinger.
+
+Independent evaluation records with errors or missing metrics: 0 cases. Exact fields: `{}`.
+
+See `summary.csv` for all 71 cases and `audit.json` for the output checks.
