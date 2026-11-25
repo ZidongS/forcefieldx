@@ -83,3 +83,30 @@ The independently scaled repulsion and staged-release experimental strategies
 were rejected and are not exposed as production options. In particular, the
 strong-repulsion setting failed the 7kzn repeat fit-loss criterion. The default
 geometry and data weights have not been changed.
+
+## Round four: rejected scale and density-buffer experiments
+
+The 2026-11-25 development screen retained no new implementation or preset.
+Re-fitting diffraction scales between coordinate stages did not provide stable
+quality gains on four X-ray cases and worsened 1yab clashscore/MolProbity.
+Reducing the diagnostic runner's scattering buffer from 4 to 1 Angstrom gave
+mixed full-budget results: 1yab Rfree 0.251347 -> 0.258355, 4xcr 0.288890 ->
+0.284623, and 5zgl 0.120240 -> 0.120467. The 1yab loss exceeded the predefined
+0.002 limit. The 2fma 1-Angstrom run reached 300 steps at GRMS 1.662; its
+4-Angstrom control was stopped after the pre-optimization directional finite
+difference log stopped progressing for over 15 minutes. Neither the speedup
+nor equivalent refinement quality was established. DiffractionData's own
+scattering-buffer default remains 0.75; the 4-Angstrom value was the diagnostic
+runner's explicit baseline, not the library default.
+
+The final matrix has 30 attempts, 29 evaluated structures, 25 converged runs,
+four iteration-limit outputs and one cancelled control. All 29 output identity,
+finite-coordinate, final-objective, convergence-label and metric audits passed.
+Earlier guard-development attempts are preserved separately in the archive.
+The experiment directory was moved outside the production checkout; no
+rejected Java implementation or tuning preset was added. The evidence ZIP
+SHA-256 is bec63d0f5ba25257c7ee204125d9ea6841a29ac8130e5c5eab6d245d448aa0e4.
+
+Rfree is descriptive for these development experiments: FFX's scale and
+SigmaA estimation use free-R-labelled reflections. Historical AIMNet2 results
+are whole-pipeline comparisons, not an isolated potential ablation.
