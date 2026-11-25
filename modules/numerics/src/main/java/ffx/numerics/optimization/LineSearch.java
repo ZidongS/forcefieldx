@@ -101,6 +101,9 @@ public class LineSearch {
    */
   private final int n;
 
+  /** Bound recursive searches, including targets with undefined spline gradients. */
+  private int searchSteps;
+
   /**
    * Step direction.
    */
@@ -296,6 +299,7 @@ public class LineSearch {
     step = min(step, sNorm);
     step = min(max(step, DEFAULT_STEPMIN), DEFAULT_STEPMAX);
 
+    searchSteps = 0;
     return begin();
   }
 
@@ -332,6 +336,9 @@ public class LineSearch {
    * @return The final function value after completing the line search.
    */
   private double step() {
+    if (++searchSteps > 100 || !Double.isFinite(step) || step <= 0.0) {
+      return failedSearch();
+    }
     // Store previous values and take a step
     fA = fB;
     sgA = sgB;
@@ -341,13 +348,16 @@ public class LineSearch {
     functionEvaluations[0]++;
     fB = optimizationSystem.energyAndGradient(x, g);
     sgB = v1DotV2(n, s, 0, 1, g, 0, 1);
+    if (!Double.isFinite(fB) || !Double.isFinite(sgB)) {
+      return failedSearch();
+    }
 
     // Scale step size if initial gradient change is too large
     if (abs(sgB / sgA) >= DEFAULT_SLOPEMAX && restart) {
       arraycopy(x0, 0, x, 0, n);
       step /= STEP_SCALE_FACTOR;
       info[0] = LineSearchResult.ScaleStep;
-      begin();
+      return begin();
     }
     restart = false;
 
@@ -380,6 +390,15 @@ public class LineSearch {
     step = min(step, DEFAULT_STEPMAX);
 
     return step();
+  }
+
+  /** Restore the starting state rather than overflowing the stack or returning NaNs. */
+  private double failedSearch() {
+    arraycopy(x0, 0, x, 0, n);
+    functionEvaluations[0]++;
+    double value = optimizationSystem.energyAndGradient(x, g);
+    info[0] = LineSearchResult.BadIntpln;
+    return value;
   }
 
   /**
