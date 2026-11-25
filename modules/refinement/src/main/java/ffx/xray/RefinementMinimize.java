@@ -153,6 +153,15 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
    * condition the optimization landscape.
    */
   private final double[] scaling;
+  private final boolean adGradientOptimizer;
+  private final double adMaxAtomStep;
+  private ADGradientOptimizer.Result adOptimizationResult;
+
+  /** Target owned by this minimizer; the caller is responsible for destroying it. */
+  public RefinementEnergy getRefinementEnergy() { return refinementEnergy; }
+
+  /** Last result from the optional Cartesian AD optimizer; null for the conventional path. */
+  public ADGradientOptimizer.Result getADOptimizationResult() { return adOptimizationResult; }
   /**
    * A flag indicating whether the refinement process has completed.
    * <p>
@@ -160,7 +169,7 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
    * completion status of the refinement procedure. It is set to `false` initially
    * and updated to `true` when the process is finished.
    */
-  private boolean done = false;
+  private volatile boolean done = false;
   /**
    * Flag indicating whether the optimization or refinement process should be terminated.
    * <p>
@@ -168,7 +177,7 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
    * to an external or internal condition. It is managed by the class and leveraged by relevant methods
    * to ensure termination of iterative processes when required.
    */
-  private boolean terminate = false;
+  private volatile boolean terminate = false;
   /**
    * A variable that represents the elapsed time or duration associated
    * with the refinement process in milliseconds.
@@ -215,6 +224,21 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
     this.listener = algorithmListener;
     this.refinementModel = dataContainer.getRefinementModel();
 
+    var assemblies = refinementModel.getMolecularAssemblies();
+    adGradientOptimizer = java.util.Arrays.stream(assemblies).anyMatch(
+        assembly -> assembly.getForceField().getBoolean("AD_GRADIENT_OPTIMIZER", false));
+    if (adGradientOptimizer && (assemblies.length != 1
+        || !assemblies[0].getForceField().getBoolean("AD_GBN2", false)
+        || refinementModel.getRefinementMode() != RefinementMode.COORDINATES
+        || assemblies[0].getActiveAtomArray().length != assemblies[0].getAtomArray().length)) {
+      throw new IllegalArgumentException("AD gradient optimizer requires one all-active AD coordinate-only assembly");
+    }
+    adMaxAtomStep = adGradientOptimizer ? Double.parseDouble(
+        assemblies[0].getForceField().getString("AD_MAX_ATOM_STEP", "0.03")) : 0.03;
+    if (!Double.isFinite(adMaxAtomStep) || adMaxAtomStep <= 0) {
+      throw new IllegalArgumentException("ad-max-atom-step must be finite and positive");
+    }
+
     // Create the target potential to optimize.
     refinementEnergy = new RefinementEnergy(dataContainer);
 
@@ -226,7 +250,7 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
     refinementModel.loadOptimizationScaling(scaling);
 
     refinementEnergy.getCoordinates(x);
-    refinementEnergy.setScaling(scaling);
+    refinementEnergy.setScaling(adGradientOptimizer ? null : scaling);
   }
 
   /**
@@ -297,17 +321,31 @@ public class RefinementMinimize implements OptimizationListener, Terminatable {
     refinementEnergy.getCoordinates(x);
 
     // Scale coordinates.
-    for (int i = 0; i < n; i++) {
-      x[i] *= scaling[i];
+    if (!adGradientOptimizer) {
+      for (int i = 0; i < n; i++) x[i] *= scaling[i];
     }
 
     long mtime = -System.nanoTime();
     time = -System.nanoTime();
     done = false;
     int status;
-    double e = refinementEnergy.energyAndGradient(x, grad);
-    status = LBFGS.minimize(n, m, x, e, grad, eps, maxiter, refinementEnergy, this);
-    done = true;
+    adOptimizationResult = null;
+    try {
+      if (adGradientOptimizer) {
+        adOptimizationResult = ADGradientOptimizer.minimize(refinementEnergy, x, maxiter,
+            eps, adMaxAtomStep, m, this);
+        grms = adOptimizationResult.gradientRms();
+        nSteps = adOptimizationResult.iterations();
+        status = adOptimizationResult.converged() ? 0
+            : (adOptimizationResult.reason().equals("line_search_stalled") ? -1 : 1);
+        logger.info(" AD Cartesian optimizer: " + adOptimizationResult.reason());
+      } else {
+        double e = refinementEnergy.energyAndGradient(x, grad);
+        status = LBFGS.minimize(n, m, x, e, grad, eps, maxiter, refinementEnergy, this);
+      }
+    } finally {
+      done = true;
+    }
     switch (status) {
       case 0:
         logger.info(format("\n Optimization achieved convergence criteria: %8.5f", grms));

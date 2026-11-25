@@ -106,6 +106,8 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
    */
   private final MolecularAssembly[] molecularAssemblies;
   private final Potential[] chemicalPotentials;
+  private ADGeometryPrior geometryPrior;
+  private double[] geometryGradient;
   /**
    * Atomic coordinates for computing the chemical energy.
    */
@@ -223,7 +225,43 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
         // We will handle parameter (un)scaling within this class.
         dataEnergy.setScaling(null);
       }
+      // An explicit optional prior, separate from the AD+GBn2 chemical potential.
+      double geometryWeight = 0.0;
+      for (MolecularAssembly assembly : molecularAssemblies) {
+        var forceField = assembly.getForceField();
+        double value = Double.parseDouble(forceField.getString("AD_GEOMETRY_WEIGHT", "0"));
+        if (!Double.isFinite(value) || value < 0.0) {
+          throw new IllegalArgumentException("ad-geometry-weight must be finite and nonnegative");
+        }
+        geometryWeight = Math.max(geometryWeight, value);
+      }
+      if (geometryWeight > 0.0) {
+        if (molecularAssemblies.length != 1 || !(chemicalPotentials[0] instanceof ADGBn2Potential)
+            || refinementMode != RefinementMode.COORDINATES) {
+          throw new IllegalArgumentException("AD geometry prior supports one AD assembly in coordinate-only refinement");
+        }
+        Atom[] atoms = molecularAssemblies[0].getAtomArray();
+        if (n != 3 * atoms.length || !Arrays.equals(scatteringAtoms, atoms)
+            || Arrays.stream(atoms).anyMatch(atom -> !atom.isActive())) {
+          throw new IllegalArgumentException("AD geometry prior requires all atoms active in the original assembly order");
+        }
+        var forceField = molecularAssemblies[0].getForceField();
+        try {
+          geometryPrior = new ADGeometryPrior(
+              forceField.getString("AD_GEOMETRY_PYTHON", ""),
+              forceField.getString("AD_GEOMETRY_WORKER", ""),
+              forceField.getString("AD_GEOMETRY_REFERENCE", ""), atoms, geometryWeight,
+              forceField.getBoolean("AD_GEOMETRY_NONBONDED", true));
+        } catch (java.io.IOException error) {
+          throw new IllegalStateException("Could not initialize AD geometry prior", error);
+        }
+        geometryGradient = new double[n];
+        logger.info(format(" Explicit AD geometry prior: weight=%g, nonbonded=%s", geometryWeight,
+            forceField.getBoolean("AD_GEOMETRY_NONBONDED", true)));
+      }
     } catch (RuntimeException | Error ex) {
+      if (geometryPrior != null) geometryPrior.close();
+      if (dataEnergy != null) dataEnergy.destroy();
       for (Potential potential : chemicalPotentials) {
         if (potential instanceof ADGBn2Potential) potential.destroy();
       }
@@ -263,6 +301,7 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
     for (Potential potential : chemicalPotentials) {
       if (potential instanceof ADGBn2Potential) success &= potential.destroy();
     }
+    if (geometryPrior != null) geometryPrior.close();
     return dataEnergy.destroy() && success;
   }
 
@@ -308,6 +347,7 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
       e = dataEnergy.energy(x, print);
     }
 
+    if (geometryPrior != null) e += geometryPrior.energy(x);
     scaleCoordinates(x);
 
     totalEnergy = e;
@@ -399,6 +439,10 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
       e = dataEnergy.energyAndGradient(x, g);
     }
 
+    if (geometryPrior != null) {
+      e += geometryPrior.energyAndGradient(x, geometryGradient);
+      for (int i = 0; i < n; i++) g[i] += geometryGradient[i];
+    }
     scaleCoordinatesAndGradient(x, g);
     totalEnergy = e;
     return e;
