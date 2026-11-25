@@ -251,13 +251,15 @@ public class RefinementEnergy implements LambdaInterface, CrystalPotential, Algo
               forceField.getString("AD_GEOMETRY_PYTHON", ""),
               forceField.getString("AD_GEOMETRY_WORKER", ""),
               forceField.getString("AD_GEOMETRY_REFERENCE", ""), atoms, geometryWeight,
-              forceField.getBoolean("AD_GEOMETRY_NONBONDED", true));
+              forceField.getBoolean("AD_GEOMETRY_NONBONDED", true),
+              forceField.getBoolean("AD_GEOMETRY_HYDROGENS", false));
         } catch (java.io.IOException error) {
           throw new IllegalStateException("Could not initialize AD geometry prior", error);
         }
         geometryGradient = new double[n];
-        logger.info(format(" Explicit AD geometry prior: weight=%g, nonbonded=%s", geometryWeight,
-            forceField.getBoolean("AD_GEOMETRY_NONBONDED", true)));
+        logger.info(format(" Explicit AD geometry prior: weight=%g, nonbonded=%s, hydrogens=%s", geometryWeight,
+            forceField.getBoolean("AD_GEOMETRY_NONBONDED", true),
+            forceField.getBoolean("AD_GEOMETRY_HYDROGENS", false)));
       }
     } catch (RuntimeException | Error ex) {
       if (geometryPrior != null) geometryPrior.close();

@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.*;
 
 /**
- * Optional heavy-atom monomer-library prior, separate from AD+GBn2.
+ * Optional monomer-library prior (heavy atoms by default), separate from AD+GBn2.
  * The worker returns a dimensionless squared-z penalty; weight converts it to kcal/mol.
  */
 public final class ADGeometryPrior implements AutoCloseable {
@@ -26,6 +26,12 @@ public final class ADGeometryPrior implements AutoCloseable {
 
   public ADGeometryPrior(String python, String worker, String referencePdb, Atom[] atoms,
       double weight, boolean nonbonded) throws IOException {
+    this(python, worker, referencePdb, atoms, weight, nonbonded, false);
+  }
+
+  /** Optionally include interpreted hydrogen restraints; the original constructor uses heavy atoms. */
+  public ADGeometryPrior(String python, String worker, String referencePdb, Atom[] atoms,
+      double weight, boolean nonbonded, boolean hydrogens) throws IOException {
     if (atoms == null || atoms.length == 0 || python == null || python.isBlank()
         || worker == null || worker.isBlank() || referencePdb == null || referencePdb.isBlank()
         || !Double.isFinite(weight) || weight <= 0) {
@@ -35,6 +41,7 @@ public final class ADGeometryPrior implements AutoCloseable {
     this.weight = weight;
     List<String> command = new ArrayList<>(List.of(python, "-u", worker, "--pdb", referencePdb));
     if (nonbonded) command.add("--nonbonded");
+    if (hydrogens) command.add("--hydrogens");
     ProcessBuilder builder = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT);
     builder.environment().put("OMP_NUM_THREADS", "1");
     builder.environment().put("OPENBLAS_NUM_THREADS", "1");

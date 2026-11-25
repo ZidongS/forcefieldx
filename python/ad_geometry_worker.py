@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Persistent, heavy-atom monomer geometry prior; dimensionless squared-z target.
+"""Persistent monomer geometry prior (heavy atoms by default); dimensionless squared-z target.
 
 Bonds, angles, chirality and planarity are enabled. The optional --nonbonded
 flag also adds library repulsion, including crystal symmetry contacts. No
 torsion, Ramachandran or reference-coordinate terms are added. This is an
-explicit extra prior, not part of the AD+GBn2 chemical energy.
+explicit extra prior, not part of the AD+GBn2 chemical energy. --hydrogens
+includes hydrogen restraints; the default leaves their added gradient zero.
 """
 import argparse,os,sys,math
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--pdb',required=True);p.add_argument('--check',action='store_true');p.add_argument('--nonbonded',action='store_true');args=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--pdb',required=True);p.add_argument('--check',action='store_true');p.add_argument('--nonbonded',action='store_true');p.add_argument('--hydrogens',action='store_true');args=p.parse_args()
  wire=os.fdopen(os.dup(sys.stdout.fileno()),'w',buffering=1);os.dup2(sys.stderr.fileno(),sys.stdout.fileno())
  import iotbx.pdb,mmtbx.model
  from libtbx.utils import null_out
@@ -22,7 +23,8 @@ def main():
   return (label.model_id,label.chain_id,label.resseq,label.icode,label.resname,label.altloc,label.name)
  lookup={identity(a):i for i,a in enumerate(full)}
  assert len(lookup)==n,'Ambiguous input atom identity'
- model=mmtbx.model.manager(model_input=inp,log=null_out()).remove_hydrogens()
+ model=mmtbx.model.manager(model_input=inp,log=null_out())
+ if not args.hydrogens:model=model.remove_hydrogens()
  params=mmtbx.model.manager.get_default_pdb_interpretation_params()
  params.pdb_interpretation.flip_symmetric_amino_acids=False
  params.pdb_interpretation.use_neutron_distances=True
@@ -31,14 +33,18 @@ def main():
  sites=model.get_sites_cart();heavy=model.get_hierarchy().atoms()
  indices=[lookup[identity(a)] for a in heavy]
  assert len(indices)==len(set(indices))
- assert len(indices)==sum(a.element.strip().upper() not in ('H','D') for a in full)
+ assert len(indices)==(n if args.hydrogens else sum(a.element.strip().upper() not in ('H','D') for a in full))
  assert all(max(abs(x-y) for x,y in zip(site,full[i].xyz))<1e-8 for site,i in zip(sites,indices)), 'Geometry processing changed coordinates'
  geo=model.get_restraints_manager().geometry
  enabled=flags(default=False,bond=True,angle=True,chirality=True,planarity=True,nonbonded=args.nonbonded)
  def evaluate(x):return geo.energies_sites(sites_cart=x,compute_gradients=True,flags=enabled)
  if args.check:
   probe=sites.deep_copy();v=list(probe[0]);v[0]+=.03;probe[0]=tuple(v);result=evaluate(probe);worst=0
-  for i in (0,len(probe)//2,len(probe)-1):
+  checked={0,len(probe)//2,len(probe)-1}
+  if args.hydrogens:
+   hydrogen_indices=[j for j,i in enumerate(indices) if full[i].element.strip().upper() in ('H','D')]
+   if hydrogen_indices:checked.add(hydrogen_indices[0])
+  for i in sorted(checked):
    for axis in range(3):
     xp=probe.deep_copy();xm=probe.deep_copy();a=list(xp[i]);b=list(xm[i]);a[axis]+=1e-5;b[axis]-=1e-5;xp[i]=tuple(a);xm[i]=tuple(b)
     numeric=(evaluate(xp).target-evaluate(xm).target)/2e-5
