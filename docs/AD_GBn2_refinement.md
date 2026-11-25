@@ -110,3 +110,34 @@ SHA-256 is bec63d0f5ba25257c7ee204125d9ea6841a29ac8130e5c5eab6d245d448aa0e4.
 Rfree is descriptive for these development experiments: FFX's scale and
 SigmaA estimation use free-R-labelled reflections. Historical AIMNet2 results
 are whole-pipeline comparisons, not an isolated potential ablation.
+
+## Native ADP restraint repair (round five)
+
+The native anisotropic/anisotropic B-factor similarity branch reused the first
+atom's tensor buffer when loading the second atom. This overwrote the first
+tensor, making the determinant difference and restoring gradient incorrectly
+zero for unequal determinants. The repair uses independent reusable buffers;
+the existing restraint formula and coefficient are unchanged. The pair branch
+is extracted into a package-private helper for direct energy/gradient tests,
+while the production loop retains scratch-buffer reuse across atom pairs.
+
+The original branch fails two of five focused tests; the repaired branch
+passes all five, including finite differences of all twelve U components,
+positive/zero penalties, exchange symmetry, and energy-only state preservation.
+The full eleven-module Maven reactor build passed with eighteen selected
+regression tests (not the entire test suite). This is a native ADP correctness
+repair. Current coordinate-only AD refinement does not execute the B-factor
+restraint branch; no improvement to the 71-system coordinate benchmark is
+established by these tests.
+
+The separate fixed-coordinate global/residue log-B development screen did not
+meet its predeclared quality gates and adds no production preset. Residue-wise
+updates improved 4xcr Rfree by 0.006621 but worsened 1yab by 0.007926 and widened
+its Rfree/Rwork gap by 0.008076. All six produced outputs passed identity,
+coordinate/occupancy preservation, bounds and metric audits. Three 1u87 runs
+failed the frozen directional derivative gate before optimization. No threshold
+was relaxed. A frozen-coordinate accuracy diagnostic with denser FFT sampling
+0.4 and 0.3 passed the same gate (absolute errors about 0.030 and 0.033 versus
+0.432 at sampling 0.6), but did not optimize coordinates or B factors and is
+not evidence of better refined geometry. Default sampling and AD weights stay
+unchanged. Raw development evidence is archived outside the production checkout.

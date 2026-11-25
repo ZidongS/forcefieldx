@@ -534,7 +534,7 @@ public class XRayEnergy implements LambdaInterface, CrystalPotential {
   private double getBFactorRestraints(boolean gradient) {
     double e = 0.0;
     double[] anisou1 = new double[6];
-    double[] anisou2;
+    double[] anisou2 = new double[6];
     double[] gradu = new double[6];
     double threeHalves = 3.0 / 2.0;
     double oneHalf = 1.0 / 2.0;
@@ -592,33 +592,7 @@ public class XRayEnergy implements LambdaInterface, CrystalPotential {
           a2.addToTempFactorGradient(-gradb);
         }
       } else if (isAnisou1 && isAnisou2) {
-        // Both atoms are anisotropic.
-        anisou1 = a1.getAnisou(anisou1);
-        anisou2 = a2.getAnisou(anisou1);
-        double det1 = mat3Determinant(anisou1);
-        double det2 = mat3Determinant(anisou2);
-        double bdiff = det1 - det2;
-        double bdiff2 = bdiff * bdiff;
-        e += eightPI23 * kTbSimWeight * bdiff2;
-        if (gradient) {
-          double gradb = eightPI23 * 2.0 * kTbSimWeight * bdiff;
-          // Atom 1
-          gradu[0] = gradb * (anisou1[1] * anisou1[2] - anisou1[5] * anisou1[5]);
-          gradu[1] = gradb * (anisou1[0] * anisou1[2] - anisou1[4] * anisou1[4]);
-          gradu[2] = gradb * (anisou1[0] * anisou1[1] - anisou1[3] * anisou1[3]);
-          gradu[3] = gradb * (2.0 * (anisou1[4] * anisou1[5] - anisou1[3] * anisou1[2]));
-          gradu[4] = gradb * (2.0 * (anisou1[3] * anisou1[5] - anisou1[4] * anisou1[1]));
-          gradu[5] = gradb * (2.0 * (anisou1[3] * anisou1[4] - anisou1[5] * anisou1[0]));
-          a1.addToAnisouGradient(gradu);
-          // Atom 2
-          gradu[0] = gradb * (anisou2[5] * anisou2[5] - anisou2[1] * anisou2[2]);
-          gradu[1] = gradb * (anisou2[4] * anisou2[4] - anisou2[0] * anisou2[2]);
-          gradu[2] = gradb * (anisou2[3] * anisou2[3] - anisou2[0] * anisou2[1]);
-          gradu[3] = gradb * (2.0 * (anisou2[3] * anisou2[2] - anisou2[4] * anisou2[5]));
-          gradu[4] = gradb * (2.0 * (anisou2[4] * anisou2[1] - anisou2[3] * anisou2[5]));
-          gradu[5] = gradb * (2.0 * (anisou2[5] * anisou2[0] - anisou2[3] * anisou2[4]));
-          a2.addToAnisouGradient(gradu);
-        }
+        e += anisotropicBFactorRestraint(a1, a2, kTbSimWeight, gradient, anisou1, anisou2, gradu);
       } else {
         if (!isAnisou1) {
           // Swap a1 and a2.
@@ -651,4 +625,38 @@ public class XRayEnergy implements LambdaInterface, CrystalPotential {
     }
     return e;
   }
+  /** Pairwise anisotropic ADP similarity, separated for energy/gradient regression checks. */
+  static double anisotropicBFactorRestraint(Atom a1, Atom a2, double weight, boolean gradient,
+      double[] anisou1, double[] anisou2, double[] gradu) {
+    double e = 0.0;
+
+    anisou1 = a1.getAnisou(anisou1);
+    anisou2 = a2.getAnisou(anisou2);
+    double det1 = mat3Determinant(anisou1);
+    double det2 = mat3Determinant(anisou2);
+    double bdiff = det1 - det2;
+    double bdiff2 = bdiff * bdiff;
+    e += eightPI23 * weight * bdiff2;
+    if (gradient) {
+      double gradb = eightPI23 * 2.0 * weight * bdiff;
+      // Atom 1
+      gradu[0] = gradb * (anisou1[1] * anisou1[2] - anisou1[5] * anisou1[5]);
+      gradu[1] = gradb * (anisou1[0] * anisou1[2] - anisou1[4] * anisou1[4]);
+      gradu[2] = gradb * (anisou1[0] * anisou1[1] - anisou1[3] * anisou1[3]);
+      gradu[3] = gradb * (2.0 * (anisou1[4] * anisou1[5] - anisou1[3] * anisou1[2]));
+      gradu[4] = gradb * (2.0 * (anisou1[3] * anisou1[5] - anisou1[4] * anisou1[1]));
+      gradu[5] = gradb * (2.0 * (anisou1[3] * anisou1[4] - anisou1[5] * anisou1[0]));
+      a1.addToAnisouGradient(gradu);
+      // Atom 2
+      gradu[0] = gradb * (anisou2[5] * anisou2[5] - anisou2[1] * anisou2[2]);
+      gradu[1] = gradb * (anisou2[4] * anisou2[4] - anisou2[0] * anisou2[2]);
+      gradu[2] = gradb * (anisou2[3] * anisou2[3] - anisou2[0] * anisou2[1]);
+      gradu[3] = gradb * (2.0 * (anisou2[3] * anisou2[2] - anisou2[4] * anisou2[5]));
+      gradu[4] = gradb * (2.0 * (anisou2[4] * anisou2[1] - anisou2[3] * anisou2[5]));
+      gradu[5] = gradb * (2.0 * (anisou2[5] * anisou2[0] - anisou2[3] * anisou2[4]));
+      a2.addToAnisouGradient(gradu);
+    }
+    return e;
+  }
+
 }
