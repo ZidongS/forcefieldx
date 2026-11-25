@@ -5,3 +5,5 @@
 !*.sbatch
 !*.md
 !*.csv
+
+refined_emringer.csv
